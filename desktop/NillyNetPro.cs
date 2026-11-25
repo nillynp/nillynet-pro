@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.2.1.0")]
-[assembly: AssemblyFileVersion("1.2.1.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace NillyNetPro
 {
@@ -665,8 +665,11 @@ namespace NillyNetPro
 
         public int ConnectionsCount { get { return _allConns.Count; } }
 
-        public MainForm(bool smokeMode)
+        public MainForm(bool smokeMode) : this(smokeMode, null) { }
+
+        public MainForm(bool smokeMode, string initialFilter)
         {
+            _dark = ReadSuiteDark(true);
             Text = "NillyNet Pro — Ultra-Light Network Monitor, Wi-Fi Band/Speed Analyzer & DNS | Nilly graphics";
             Size = new Size(1120, 700);
             MinimumSize = new Size(680, 480);
@@ -686,6 +689,7 @@ namespace NillyNetPro
             _lblSub = new Label { Text = "Ultra-Light Network · Wi-Fi Band/Speed Inspector · 0 MB Idle RAM", AutoSize = true, Location = new Point(45, 25), Font = new Font("Segoe UI", 7.6f), UseMnemonic = false };
 
             _txtSearch = new TextBox { Width = 200, Height = 26, BorderStyle = BorderStyle.FixedSingle, Font = _fUi };
+            if (!string.IsNullOrEmpty(initialFilter)) _txtSearch.Text = initialFilter;
             _txtSearch.TextChanged += delegate { RenderConnections(); };
             _txtSearch.HandleCreated += delegate { Native.SetCue(_txtSearch, "Φίλτρο process / IP (Ctrl+F)..."); };
             _btnPause = MkBtn("||", 34, "Παύση / Συνέχεια ανανέωσης (Space)", delegate { _paused = !_paused; _btnPause.Text = _paused ? "▶" : "||"; });
@@ -715,7 +719,13 @@ namespace NillyNetPro
             ctx.Items.Add("Δες Διεργασία στο NillyTask Pro", null, delegate
             {
                 string taskExe = FindSiblingExe("NillyTaskPro", "NillyTaskPro.exe");
-                if (taskExe != null) try { Process.Start(new ProcessStartInfo(taskExe) { WorkingDirectory = Path.GetDirectoryName(taskExe), UseShellExecute = true }); } catch { }
+                if (taskExe != null)
+                {
+                    string proc = (_lvConns.SelectedItems.Count > 0) ? _lvConns.SelectedItems[0].SubItems[0].Text : "";
+                    if (proc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) proc = proc.Substring(0, proc.Length - 4);
+                    string arg = !string.IsNullOrEmpty(proc) ? ("--filter \"" + proc.Replace("\"", "") + "\"") : "";
+                    try { Process.Start(new ProcessStartInfo(taskExe, arg) { WorkingDirectory = Path.GetDirectoryName(taskExe), UseShellExecute = true }); } catch { }
+                }
             });
             ctx.Items.Add("Τερματισμός Διεργασίας", null, delegate { KillSelectedConnProcess(); });
             _lvConns.ContextMenuStrip = ctx;
@@ -1545,6 +1555,22 @@ namespace NillyNetPro
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
+        private static bool ReadSuiteDark(bool fallback)
+        {
+            try
+            {
+                string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"NillySuite\suite.theme");
+                if (File.Exists(p))
+                {
+                    string s = File.ReadAllText(p, Encoding.ASCII).Trim();
+                    if (s.Equals("light", StringComparison.OrdinalIgnoreCase)) return false;
+                    if (s.Equals("dark", StringComparison.OrdinalIgnoreCase)) return true;
+                }
+            }
+            catch { }
+            return fallback;
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing) { if (_timer != null) _timer.Dispose(); if (_logoBmp != null) _logoBmp.Dispose(); _tip.Dispose(); }
@@ -1564,7 +1590,17 @@ namespace NillyNetPro
             if (args != null && args.Length > 0 && args[0].Equals("--test-smoke", StringComparison.OrdinalIgnoreCase))
                 return RunSmoke(args.Length > 1 ? args[1] : null, args.Length > 2 ? args[2] : null);
 
-            Application.Run(new MainForm(false));
+            string initFilter = null;
+            if (args != null)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (args[i].Equals("--filter", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                    { initFilter = args[i + 1]; break; }
+                }
+            }
+
+            Application.Run(new MainForm(false, initFilter));
             return 0;
         }
 
