@@ -35,8 +35,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
 
 namespace NillyNetPro
 {
@@ -493,16 +493,14 @@ namespace NillyNetPro
             rightHdr.Controls.AddRange(new Control[] { _txtSearch, _btnPause, _btnTheme, _btnInfo });
             _header.Controls.AddRange(new Control[] { _logoBox, _lblTitle, _lblSub, rightHdr });
 
-            // Tab bar
-            _tabBar = new Panel { Dock = DockStyle.Top, Height = 38, Padding = new Padding(10, 5, 10, 5) };
-            FlowLayoutPanel tabFlow = new FlowLayoutPanel { Dock = DockStyle.Left, AutoSize = true, WrapContents = false };
+            // Responsive Tab bar (auto-wraps live rate cleanly below 810px)
+            _tabBar = new Panel { Dock = DockStyle.Top, Height = 38 };
             _btnTabLive = MkBtn("Ζωντανή Κίνηση && Διεργασίες", 220, "Live Download/Upload + TCP/UDP ανά εφαρμογή", delegate { SwitchTab(0); });
             _btnTabWifi = MkBtn("Wi-Fi, Κωδικοί && Προσαρμογείς", 220, "Κάρτες δικτύου & αποθηκευμένοι κωδικοί Wi-Fi", delegate { SwitchTab(1); });
             _btnTabTools = MkBtn("Ping && 1-Κλικ DNS", 160, "Έλεγχος Ping, Flush DNS & Cloudflare/Google DNS", delegate { SwitchTab(2); });
-            tabFlow.Controls.AddRange(new Control[] { _btnTabLive, _btnTabWifi, _btnTabTools });
-            _lblLiveRate = new Label { Dock = DockStyle.Right, AutoSize = true, Font = _fBold, TextAlign = ContentAlignment.MiddleRight, Padding = new Padding(8, 6, 6, 0) };
-            _tabBar.Controls.Add(_lblLiveRate);
-            _tabBar.Controls.Add(tabFlow);
+            _lblLiveRate = new Label { AutoSize = true, Font = _fBold, TextAlign = ContentAlignment.MiddleRight, UseMnemonic = false };
+            _tabBar.Controls.AddRange(new Control[] { _btnTabLive, _btnTabWifi, _btnTabTools, _lblLiveRate });
+            _tabBar.Resize += delegate { LayoutTabBar(); };
 
             // Tab 0: Live
             _pnlLive = new Panel { Dock = DockStyle.Fill };
@@ -613,8 +611,28 @@ namespace NillyNetPro
             Shown += delegate { Native.TrimMemory(); };
 
             ApplyTheme();
+            LayoutTabBar();
             SampleNetwork();
             if (!smokeMode) _timer.Start();
+        }
+
+        private void LayoutTabBar()
+        {
+            int w = Math.Max(560, _tabBar.ClientSize.Width);
+            int x = 10;
+            _btnTabLive.Location = new Point(x, 5); x += _btnTabLive.Width + 6;
+            _btnTabWifi.Location = new Point(x, 5); x += _btnTabWifi.Width + 6;
+            _btnTabTools.Location = new Point(x, 5); x += _btnTabTools.Width + 6;
+            if (w >= x + 175)
+            {
+                if (_tabBar.Height != 38) _tabBar.Height = 38;
+                _lblLiveRate.Location = new Point(w - Math.Max(160, _lblLiveRate.Width) - 12, 10);
+            }
+            else
+            {
+                if (_tabBar.Height != 62) _tabBar.Height = 62;
+                _lblLiveRate.Location = new Point(12, 38);
+            }
         }
 
         private Button MkBtn(string txt, int w, string tip, EventHandler click)
@@ -986,7 +1004,7 @@ namespace NillyNetPro
 
                 PictureBox pic = new PictureBox { Size = new Size(42, 42), Location = new Point(18, 16), SizeMode = PictureBoxSizeMode.Zoom, Image = _logoBmp };
                 Label hdr = new Label { Text = "NillyNet Pro v1.0", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
-                Label sub = new Label { Text = "Ultra-Light Native Network Monitor, Wi-Fi Passwords & DNS Tools", Location = new Point(72, 42), AutoSize = true, Font = _fSmall, ForeColor = _accent };
+                Label sub = new Label { Text = "Ultra-Light Native Network Monitor, Wi-Fi Passwords & DNS Tools", Location = new Point(72, 42), AutoSize = true, Font = _fSmall, ForeColor = _accent, UseMnemonic = false };
 
                 Panel card = new Panel { Location = new Point(18, 72), Size = new Size(474, 185), BackColor = _bgPanel };
                 Label specs = new Label
