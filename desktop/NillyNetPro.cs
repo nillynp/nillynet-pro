@@ -1,5 +1,5 @@
 // ============================================================================
-// NillyNet Pro v1.2 — Ultra-Light Native Windows 10/11 Network Monitor,
+// NillyNet Pro v1.3.1 — Ultra-Light Native Windows 10/11 Network Monitor,
 //                     Full Wi-Fi Band/Channel/Speed Analyzer, Wi-Fi Passwords & DNS
 // created by Nilly graphics (Nillygraphics · Sotiris Christos) — https://nillygraphics.com/
 // Strictly C# 5 compatible (.NET Framework 4.x csc.exe — 0 external DLLs)
@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 namespace NillyNetPro
 {
@@ -637,6 +637,10 @@ namespace NillyNetPro
         private DateTime _prevSample = DateTime.UtcNow;
         private double _curRxRate, _curTxRate;
         private List<NetConn> _allConns = new List<NetConn>();
+        private int _connSortCol = 0; private bool _connSortAsc = true;
+        private int _nearSortCol = 3; private bool _nearSortAsc = false;
+        private static readonly string[] ConnCols = new string[] { "Εφαρμογή (Process)", "PID", "Proto", "Τοπική Διεύθυνση", "Απομακρυσμένη IP:Port", "Κατάσταση" };
+        private static readonly string[] NearCols = new string[] { "Όνομα Wi-Fi (SSID)", "Band", "Κανάλι", "Σήμα / dBm", "Πρότυπο Wi-Fi", "Ασφάλεια", "BSSID (MAC)" };
 
         // Tab 1: Full Wi-Fi Analyzer + Nearby Networks + Adapters + Saved Passwords
         private readonly Panel _pnlWifi;
@@ -711,8 +715,15 @@ namespace NillyNetPro
             _pnlLive = new Panel { Dock = DockStyle.Fill };
             _graphPanel = new DoubleBufferedPanel { Dock = DockStyle.Top, Height = 122 };
             _graphPanel.Paint += GraphPanel_Paint;
-            _lvConns = BuildLV(new string[] { "Εφαρμογή (Process)", "PID", "Proto", "Τοπική Διεύθυνση", "Απομακρυσμένη IP:Port", "Κατάσταση" },
-                               new int[] { 220, 68, 58, 200, 260, 140 });
+            _lvConns = BuildLV(ConnCols, new int[] { 220, 68, 58, 200, 260, 140 });
+            SetSortHeaders(_lvConns, ConnCols, _connSortCol, _connSortAsc);
+            _lvConns.ColumnClick += delegate(object s, ColumnClickEventArgs e)
+            {
+                if (_connSortCol == e.Column) _connSortAsc = !_connSortAsc;
+                else { _connSortCol = e.Column; _connSortAsc = true; }
+                SetSortHeaders(_lvConns, ConnCols, _connSortCol, _connSortAsc);
+                RenderConnections();
+            };
             _lvConns.Resize += delegate { FitConnColumns(); };
             ContextMenuStrip ctx = new ContextMenuStrip();
             ctx.Items.Add("Αντιγραφή Απομακρυσμένης IP", null, delegate { if (_lvConns.SelectedItems.Count > 0) try { Clipboard.SetText(_lvConns.SelectedItems[0].SubItems[4].Text); } catch { } });
@@ -747,8 +758,15 @@ namespace NillyNetPro
             // Top split: Nearby Wi-Fi Networks (Band, Channel, Signal dBm, Standard)
             Panel pNear = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 6, 0, 0) };
             Label lblNear = new Label { Text = "ΚΟΝΤΙΝΑ ΔΙΚΤΥΑ WI-FI & ΚΑΝΑΛΙΑ (Band 2.4 / 5 / 6 GHz · Σήμα dBm · Πρότυπο)", Dock = DockStyle.Top, Height = 22, Font = _fBold, UseMnemonic = false };
-            _lvNearby = BuildLV(new string[] { "Όνομα Wi-Fi (SSID)", "Band", "Κανάλι", "Σήμα / dBm", "Πρότυπο Wi-Fi", "Ασφάλεια", "BSSID (MAC)" },
-                                new int[] { 220, 72, 64, 120, 155, 130, 145 });
+            _lvNearby = BuildLV(NearCols, new int[] { 220, 72, 64, 120, 155, 130, 145 });
+            SetSortHeaders(_lvNearby, NearCols, _nearSortCol, _nearSortAsc);
+            _lvNearby.ColumnClick += delegate(object s, ColumnClickEventArgs e)
+            {
+                if (_nearSortCol == e.Column) _nearSortAsc = !_nearSortAsc;
+                else { _nearSortCol = e.Column; _nearSortAsc = (e.Column != 3); }
+                SetSortHeaders(_lvNearby, NearCols, _nearSortCol, _nearSortAsc);
+                RenderNearbyWifi();
+            };
             _lvNearby.Resize += delegate { FitLastColumn(_lvNearby, new int[] { 200, 72, 62, 120, 155, 130, 140 }); };
             pNear.Controls.Add(_lvNearby);
             pNear.Controls.Add(lblNear);
@@ -1102,16 +1120,40 @@ namespace NillyNetPro
             th.IsBackground = true; th.Start();
         }
 
-        private void PopulateWifiTabUi(List<string> profs)
+        private static void SetSortHeaders(ListView lv, string[] cols, int sortCol, bool asc)
         {
-            _wifiCard.Invalidate();
+            if (lv == null || lv.Columns.Count < cols.Length) return;
+            for (int i = 0; i < cols.Length; i++)
+                lv.Columns[i].Text = cols[i] + (i == sortCol ? (asc ? " ▲" : " ▼") : "");
+        }
 
-            // Nearby Wi-Fi table
+        private void RenderNearbyWifi()
+        {
+            List<NearbyWifi> sorted = new List<NearbyWifi>(_nearbyWifi);
+            int sign = _nearSortAsc ? 1 : -1;
+            sorted.Sort(delegate(NearbyWifi a, NearbyWifi b)
+            {
+                int cmp = 0;
+                if (_nearSortCol == 1) cmp = string.Compare(a.Band ?? "", b.Band ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_nearSortCol == 2)
+                {
+                    int ca, cb;
+                    if (int.TryParse(a.Channel, out ca) && int.TryParse(b.Channel, out cb)) cmp = ca.CompareTo(cb);
+                    else cmp = string.Compare(a.Channel ?? "", b.Channel ?? "", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (_nearSortCol == 3) cmp = a.SignalPct.CompareTo(b.SignalPct);
+                else if (_nearSortCol == 4) cmp = string.Compare(a.Radio ?? "", b.Radio ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_nearSortCol == 5) cmp = string.Compare(a.Auth ?? "", b.Auth ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_nearSortCol == 6) cmp = string.Compare(a.Bssid ?? "", b.Bssid ?? "", StringComparison.OrdinalIgnoreCase);
+                else cmp = string.Compare(a.Ssid ?? "", b.Ssid ?? "", StringComparison.OrdinalIgnoreCase);
+                if (cmp == 0) cmp = b.SignalPct.CompareTo(a.SignalPct);
+                return sign * cmp;
+            });
             _lvNearby.BeginUpdate();
             _lvNearby.Items.Clear();
-            for (int i = 0; i < _nearbyWifi.Count; i++)
+            for (int i = 0; i < sorted.Count; i++)
             {
-                NearbyWifi n = _nearbyWifi[i];
+                NearbyWifi n = sorted[i];
                 ListViewItem it = new ListViewItem(n.Ssid);
                 it.SubItems.Add(n.Band);
                 it.SubItems.Add(string.IsNullOrEmpty(n.Channel) ? "—" : ("Ch " + n.Channel));
@@ -1123,6 +1165,12 @@ namespace NillyNetPro
             }
             _lvNearby.EndUpdate();
             FitLastColumn(_lvNearby, new int[] { 200, 72, 62, 120, 155, 130, 140 });
+        }
+
+        private void PopulateWifiTabUi(List<string> profs)
+        {
+            _wifiCard.Invalidate();
+            RenderNearbyWifi();
 
             // Adapters table
             _lvAdapters.BeginUpdate();
@@ -1257,13 +1305,31 @@ namespace NillyNetPro
         private void RenderConnections()
         {
             string q = _txtSearch.Text.Trim().ToLowerInvariant();
-            _lvConns.BeginUpdate();
-            _lvConns.Items.Clear();
-            int max = 350;
-            for (int i = 0; i < _allConns.Count && _lvConns.Items.Count < max; i++)
+            List<NetConn> rows = new List<NetConn>(_allConns.Count);
+            for (int i = 0; i < _allConns.Count; i++)
             {
                 NetConn c = _allConns[i];
-                if (q.Length > 0 && c.Norm.IndexOf(q, StringComparison.Ordinal) < 0) continue;
+                if (q.Length == 0 || c.Norm.IndexOf(q, StringComparison.Ordinal) >= 0) rows.Add(c);
+            }
+            int sign = _connSortAsc ? 1 : -1;
+            rows.Sort(delegate(NetConn a, NetConn b)
+            {
+                int cmp = 0;
+                if (_connSortCol == 1) cmp = a.Pid.CompareTo(b.Pid);
+                else if (_connSortCol == 2) cmp = string.Compare(a.Proto ?? "", b.Proto ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_connSortCol == 3) cmp = string.Compare(a.LocalEnd ?? "", b.LocalEnd ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_connSortCol == 4) cmp = string.Compare(a.RemoteEnd ?? "", b.RemoteEnd ?? "", StringComparison.OrdinalIgnoreCase);
+                else if (_connSortCol == 5) cmp = string.Compare(a.State ?? "", b.State ?? "", StringComparison.OrdinalIgnoreCase);
+                else cmp = string.Compare(a.ProcessName ?? "", b.ProcessName ?? "", StringComparison.OrdinalIgnoreCase);
+                if (cmp == 0) cmp = a.Pid.CompareTo(b.Pid);
+                return sign * cmp;
+            });
+            _lvConns.BeginUpdate();
+            _lvConns.Items.Clear();
+            int max = Math.Min(350, rows.Count);
+            for (int i = 0; i < max; i++)
+            {
+                NetConn c = rows[i];
                 ListViewItem it = new ListViewItem(c.ProcessName);
                 it.SubItems.Add(c.Pid.ToString());
                 it.SubItems.Add(c.Proto);
@@ -1327,7 +1393,14 @@ namespace NillyNetPro
             if (MessageBox.Show(this, "Τερματισμός διεργασίας " + c.ProcessName + " (PID " + c.Pid + ");",
                 "NillyNet Pro", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             try { Process.GetProcessById(c.Pid).Kill(); SampleNetwork(); }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "NillyNet Pro"); }
+            catch (Exception ex)
+            {
+                string low = (ex.Message ?? "").ToLowerInvariant();
+                string msg = low.Contains("access is denied")
+                    ? "Δεν υπάρχει δικαίωμα τερματισμού αυτής της διεργασίας συστήματος (απαιτεί Administrator)."
+                    : ex.Message;
+                MessageBox.Show(this, msg, "NillyNet Pro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void RunPingAsync()
@@ -1456,7 +1529,7 @@ namespace NillyNetPro
                 Native.SetDarkTitlebar(dlg.Handle, _dark);
 
                 PictureBox pic = new PictureBox { Size = new Size(42, 42), Location = new Point(18, 16), SizeMode = PictureBoxSizeMode.Zoom, Image = _logoBmp };
-                Label hdr = new Label { Text = "NillyNet Pro v1.1", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
+                Label hdr = new Label { Text = "NillyNet Pro v1.3.1", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
                 Label sub = new Label { Text = "Ultra-Light Native Network Monitor, Wi-Fi Band/Speed Analyzer & DNS Tools", Location = new Point(72, 42), AutoSize = true, Font = _fSmall, ForeColor = _accent, UseMnemonic = false };
 
                 Panel card = new Panel { Location = new Point(18, 72), Size = new Size(478, 200), BackColor = _bgPanel };
