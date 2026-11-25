@@ -1,5 +1,5 @@
 // ============================================================================
-// NillyNet Pro v1.1 — Ultra-Light Native Windows 10/11 Network Monitor,
+// NillyNet Pro v1.2 — Ultra-Light Native Windows 10/11 Network Monitor,
 //                     Full Wi-Fi Band/Channel/Speed Analyzer, Wi-Fi Passwords & DNS
 // created by Nilly graphics (Nillygraphics · Sotiris Christos) — https://nillygraphics.com/
 // Strictly C# 5 compatible (.NET Framework 4.x csc.exe — 0 external DLLs)
@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace NillyNetPro
 {
@@ -654,7 +654,7 @@ namespace NillyNetPro
         private readonly Panel _pnlTools;
         private readonly FlowLayoutPanel _toolRow;
         private readonly TextBox _txtPingHost, _txtToolLog;
-        private readonly Button _btnPingAll, _btnFlushDns, _btnDnsCf, _btnDnsGgl, _btnDnsAuto, _btnWinNet;
+        private readonly Button _btnPingAll, _btnFlushDns, _btnDnsCf, _btnDnsGgl, _btnDnsAuto, _btnWinNet, _btnNetNote;
 
         private readonly System.Windows.Forms.Timer _timer;
         private Bitmap _logoBmp;
@@ -712,6 +712,11 @@ namespace NillyNetPro
             _lvConns.Resize += delegate { FitConnColumns(); };
             ContextMenuStrip ctx = new ContextMenuStrip();
             ctx.Items.Add("Αντιγραφή Απομακρυσμένης IP", null, delegate { if (_lvConns.SelectedItems.Count > 0) Clipboard.SetText(_lvConns.SelectedItems[0].SubItems[4].Text); });
+            ctx.Items.Add("Δες Διεργασία στο NillyTask Pro", null, delegate
+            {
+                string taskExe = FindSiblingExe("NillyTaskPro", "NillyTaskPro.exe");
+                if (taskExe != null) try { Process.Start(new ProcessStartInfo(taskExe) { WorkingDirectory = Path.GetDirectoryName(taskExe), UseShellExecute = true }); } catch { }
+            });
             ctx.Items.Add("Τερματισμός Διεργασίας", null, delegate { KillSelectedConnProcess(); });
             _lvConns.ContextMenuStrip = ctx;
             _pnlLive.Controls.Add(_lvConns);
@@ -795,7 +800,8 @@ namespace NillyNetPro
             _btnDnsGgl = MkBtn("DNS 8.8.8.8 (Google)", 150, "Google DNS", delegate { ApplyDns("8.8.8.8", "8.8.4.4"); });
             _btnDnsAuto = MkBtn("Αυτόματο DNS", 115, "Επαναφορά DHCP DNS", delegate { ApplyDns(null, null); });
             _btnWinNet = MkBtn("Ρυθμίσεις Win", 110, "Άνοιγμα Windows Network Settings", delegate { OpenUrl("ms-settings:network"); });
-            _toolRow.Controls.AddRange(new Control[] { _txtPingHost, _btnPingAll, _btnFlushDns, _btnDnsCf, _btnDnsGgl, _btnDnsAuto, _btnWinNet });
+            _btnNetNote = MkBtn("↗ Αναφορά σε NillyNote", 168, "Αποστολή πλήρους αναφοράς Δικτύου/Wi-Fi/Ping σε NillyNote Pro", delegate { SendReportToNillyNote(); });
+            _toolRow.Controls.AddRange(new Control[] { _txtPingHost, _btnPingAll, _btnFlushDns, _btnDnsCf, _btnDnsGgl, _btnDnsAuto, _btnWinNet, _btnNetNote });
 
             _txtToolLog = new TextBox
             {
@@ -1010,6 +1016,8 @@ namespace NillyNetPro
             StyleBtn(_btnDnsGgl, false, _cyan);
             StyleBtn(_btnDnsAuto, false, _fgMuted);
             StyleBtn(_btnWinNet, false, _fgMuted);
+            StyleBtn(_btnNetNote, false, _accent);
+            _btnNetNote.ForeColor = _accent; _btnNetNote.FlatAppearance.BorderColor = _accent;
         }
 
         private void StyleBtn(Button b, bool primary, Color accent)
@@ -1468,6 +1476,59 @@ namespace NillyNetPro
                 dlg.AcceptButton = btnClose; dlg.CancelButton = btnClose;
                 dlg.ShowDialog(this);
             }
+        }
+
+        private static string FindSiblingExe(string folder, string exeName)
+        {
+            try
+            {
+                string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"NillySuite\" + folder + @"\" + exeName);
+                if (File.Exists(appData)) return appData;
+                DirectoryInfo par = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'));
+                if (par != null)
+                {
+                    string sib = Path.Combine(Path.Combine(par.FullName, folder), exeName);
+                    if (File.Exists(sib)) return sib;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private void SendReportToNillyNote()
+        {
+            WifiLiveInfo wf = NetEngine.GetLiveWifiInfo();
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("=== NillyNet Pro — Αναφορά Δικτύου & Wi-Fi ===");
+            sb.AppendLine("Ημερομηνία: " + DateTime.Now.ToString("dd/MM/yyyy HH:mm"));
+            sb.AppendLine("created by Nilly graphics (Sotiris Christos) — nillygraphics.com");
+            sb.AppendLine("");
+            sb.AppendLine("Προσαρμογέας: " + wf.AdapterName + " (" + wf.Description + ")");
+            sb.AppendLine("IPv4: " + wf.IpV4 + "  |  Gateway: " + wf.Gateway + "  |  DNS: " + wf.Dns);
+            sb.AppendLine("MAC: " + wf.MacAddress + "  |  Link: ↓ " + wf.RxMbps + " / ↑ " + wf.TxMbps);
+            if (wf.HasWifi && wf.Connected)
+                sb.AppendLine(string.Format("Wi-Fi: {0}  |  Band: {1}  |  Ch {2}  |  {3}  |  Σήμα: {4}% ({5} dBm)  |  {6}", wf.Ssid, wf.Band, wf.Channel, wf.WifiGen, wf.SignalPct, wf.EstDbm, wf.Auth));
+            if (_txtToolLog != null && !string.IsNullOrEmpty(_txtToolLog.Text))
+            {
+                sb.AppendLine("");
+                sb.AppendLine("--- Ping / DNS Log ---");
+                sb.AppendLine(_txtToolLog.Text.Trim());
+            }
+            string txt = sb.ToString();
+            string noteExe = FindSiblingExe("NillyNotePro", "NillyNotePro.exe");
+            if (noteExe != null)
+            {
+                try
+                {
+                    string tmp = Path.Combine(Path.GetTempPath(), "NillyNet_Report_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".txt");
+                    File.WriteAllText(tmp, txt, new UTF8Encoding(false));
+                    Process.Start(new ProcessStartInfo(noteExe, "\"" + tmp + "\"") { WorkingDirectory = Path.GetDirectoryName(noteExe), UseShellExecute = true });
+                    _lblStatus.Text = "↗ Η αναφορά δικτύου εστάλη στο NillyNote Pro!";
+                    return;
+                }
+                catch { }
+            }
+            try { Clipboard.SetText(txt); _lblStatus.Text = "✓ Αντιγράφηκε η αναφορά δικτύου στο πρόχειρο."; } catch { }
         }
 
         private static void OpenUrl(string u) { try { Process.Start(new ProcessStartInfo(u) { UseShellExecute = true }); } catch { } }
