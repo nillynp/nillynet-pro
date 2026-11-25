@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.2.1.0")]
+[assembly: AssemblyFileVersion("1.2.1.0")]
 
 namespace NillyNetPro
 {
@@ -711,7 +711,7 @@ namespace NillyNetPro
                                new int[] { 220, 68, 58, 200, 260, 140 });
             _lvConns.Resize += delegate { FitConnColumns(); };
             ContextMenuStrip ctx = new ContextMenuStrip();
-            ctx.Items.Add("Αντιγραφή Απομακρυσμένης IP", null, delegate { if (_lvConns.SelectedItems.Count > 0) Clipboard.SetText(_lvConns.SelectedItems[0].SubItems[4].Text); });
+            ctx.Items.Add("Αντιγραφή Απομακρυσμένης IP", null, delegate { if (_lvConns.SelectedItems.Count > 0) try { Clipboard.SetText(_lvConns.SelectedItems[0].SubItems[4].Text); } catch { } });
             ctx.Items.Add("Δες Διεργασία στο NillyTask Pro", null, delegate
             {
                 string taskExe = FindSiblingExe("NillyTaskPro", "NillyTaskPro.exe");
@@ -773,8 +773,12 @@ namespace NillyNetPro
             {
                 if (!string.IsNullOrEmpty(_lastRevealedKey) && !_lastRevealedKey.StartsWith("("))
                 {
-                    Clipboard.SetText(_lastRevealedKey);
-                    _lblStatus.Text = "✓ Αντιγράφηκε ο κωδικός Wi-Fi στο πρόχειρο.";
+                    try
+                    {
+                        Clipboard.SetText(_lastRevealedKey);
+                        _lblStatus.Text = "✓ Αντιγράφηκε ο κωδικός Wi-Fi στο πρόχειρο.";
+                    }
+                    catch { _lblStatus.Text = "⚠ Το πρόχειρο είναι απασχολημένο. Δοκίμασε ξανά."; }
                 }
             });
             _btnCopyWifi.Location = new Point(10, 84);
