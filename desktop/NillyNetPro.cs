@@ -1,5 +1,5 @@
 // ============================================================================
-// NillyNet Pro v1.3.1 — Ultra-Light Native Windows 10/11 Network Monitor,
+// NillyNet Pro v1.3.2 — Ultra-Light Native Windows 10/11 Network Monitor,
 //                     Full Wi-Fi Band/Channel/Speed Analyzer, Wi-Fi Passwords & DNS
 // created by Nilly graphics (Nillygraphics · Sotiris Christos) — https://nillygraphics.com/
 // Strictly C# 5 compatible (.NET Framework 4.x csc.exe — 0 external DLLs)
@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.3.2.0")]
+[assembly: AssemblyFileVersion("1.3.2.0")]
 
 namespace NillyNetPro
 {
@@ -663,6 +663,7 @@ namespace NillyNetPro
         private readonly System.Windows.Forms.Timer _timer;
         private Bitmap _logoBmp;
         private readonly Font _fTitle = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+        private readonly Font _fWifiHdr = new Font("Segoe UI", 11.2f, FontStyle.Bold);
         private readonly Font _fUi = new Font("Segoe UI", 9.0f);
         private readonly Font _fBold = new Font("Segoe UI", 9.0f, FontStyle.Bold);
         private readonly Font _fSmall = new Font("Segoe UI", 8.2f);
@@ -1227,8 +1228,8 @@ namespace NillyNetPro
 
             if (wf.HasWifi && wf.Connected)
             {
-                TextRenderer.DrawText(g, string.Format("📶  {0}   ·   {1}   ·   {2}", wf.Ssid, wf.Band, wf.WifiGen),
-                    new Font("Segoe UI", 11.2f, FontStyle.Bold), new Rectangle(14, 10, rightLimit - 14, 24), _fgMain, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(g, string.Format("{0}   ·   {1}   ·   {2}", wf.Ssid, wf.Band, wf.WifiGen),
+                    _fWifiHdr, new Rectangle(14, 10, rightLimit - 14, 24), _fgMain, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 
                 string line2 = string.Format("Ταχύτητα Link: ↓ {0}  /  ↑ {1}    ·    Κανάλι: {2}    ·    Ασφάλεια: {3} ({4})",
                     wf.RxMbps, wf.TxMbps, wf.Channel, wf.Auth, wf.Cipher);
@@ -1256,7 +1257,7 @@ namespace NillyNetPro
                 string hdr = string.IsNullOrEmpty(wf.AdapterName)
                     ? "Δίκτυο & Wi-Fi Analyzer"
                     : string.Format("Ενεργή Σύνδεση: {0}  ({1})  ·  Link: {2}", wf.AdapterName, wf.Description, string.IsNullOrEmpty(wf.RxMbps) ? "—" : wf.RxMbps);
-                TextRenderer.DrawText(g, hdr, new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                TextRenderer.DrawText(g, hdr, _fTitle,
                     new Rectangle(14, 12, rightLimit - 14, 24), _fgMain, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 
                 string netLine = string.Format("IPv4: {0}    ·    Gateway: {1}    ·    DNS: {2}    ·    MAC: {3}",
@@ -1529,7 +1530,7 @@ namespace NillyNetPro
                 Native.SetDarkTitlebar(dlg.Handle, _dark);
 
                 PictureBox pic = new PictureBox { Size = new Size(42, 42), Location = new Point(18, 16), SizeMode = PictureBoxSizeMode.Zoom, Image = _logoBmp };
-                Label hdr = new Label { Text = "NillyNet Pro v1.3.1", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
+                Label hdr = new Label { Text = "NillyNet Pro v1.3.2", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
                 Label sub = new Label { Text = "Ultra-Light Native Network Monitor, Wi-Fi Band/Speed Analyzer & DNS Tools", Location = new Point(72, 42), AutoSize = true, Font = _fSmall, ForeColor = _accent, UseMnemonic = false };
 
                 Panel card = new Panel { Location = new Point(18, 72), Size = new Size(478, 200), BackColor = _bgPanel };
@@ -1646,7 +1647,7 @@ namespace NillyNetPro
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { if (_timer != null) _timer.Dispose(); if (_logoBmp != null) _logoBmp.Dispose(); _tip.Dispose(); }
+            if (disposing) { if (_timer != null) _timer.Dispose(); if (_logoBmp != null) _logoBmp.Dispose(); _fTitle.Dispose(); _fWifiHdr.Dispose(); _fUi.Dispose(); _fBold.Dispose(); _fSmall.Dispose(); _tip.Dispose(); }
             base.Dispose(disposing);
         }
     }
