@@ -1,5 +1,5 @@
 // ============================================================================
-// NillyNet Pro v1.3.2 — Ultra-Light Native Windows 10/11 Network Monitor,
+// NillyNet Pro v1.3.3 — Ultra-Light Native Windows 10/11 Network Monitor,
 //                     Full Wi-Fi Band/Channel/Speed Analyzer, Wi-Fi Passwords & DNS
 // created by Nilly graphics (Nillygraphics · Sotiris Christos) — https://nillygraphics.com/
 // Strictly C# 5 compatible (.NET Framework 4.x csc.exe — 0 external DLLs)
@@ -38,8 +38,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("NillyNet Pro")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Nilly graphics (Sotiris Christos) — https://nillygraphics.com/")]
 [assembly: AssemblyTrademark("Nilly graphics / Nillygraphics — Sotiris Christos")]
-[assembly: AssemblyVersion("1.3.2.0")]
-[assembly: AssemblyFileVersion("1.3.2.0")]
+[assembly: AssemblyVersion("1.3.3.0")]
+[assembly: AssemblyFileVersion("1.3.3.0")]
 
 namespace NillyNetPro
 {
@@ -661,6 +661,7 @@ namespace NillyNetPro
         private readonly Button _btnPingAll, _btnFlushDns, _btnDnsCf, _btnDnsGgl, _btnDnsAuto, _btnWinNet, _btnNetNote;
 
         private readonly System.Windows.Forms.Timer _timer;
+        private bool _wasMinimized = false;
         private Bitmap _logoBmp;
         private readonly Font _fTitle = new Font("Segoe UI", 10.5f, FontStyle.Bold);
         private readonly Font _fWifiHdr = new Font("Segoe UI", 11.2f, FontStyle.Bold);
@@ -869,7 +870,20 @@ namespace NillyNetPro
             _prevRx = _startRx; _prevTx = _startTx; _prevSample = DateTime.UtcNow;
 
             _timer = new System.Windows.Forms.Timer { Interval = 1500 };
-            _timer.Tick += delegate { if (!_paused) SampleNetwork(); };
+            _timer.Tick += delegate { if (!_paused && WindowState != FormWindowState.Minimized) SampleNetwork(); };
+
+            Resize += delegate
+            {
+                if (WindowState == FormWindowState.Minimized) _wasMinimized = true;
+                else if (_wasMinimized)
+                {
+                    _wasMinimized = false;
+                    long rrx, rtx;
+                    NetEngine.GetTotalBytes(out rrx, out rtx);
+                    _prevRx = rrx; _prevTx = rtx; _prevSample = DateTime.UtcNow;
+                    if (!_paused) SampleNetwork();
+                }
+            };
 
             HandleCreated += delegate
             {
@@ -1530,7 +1544,7 @@ namespace NillyNetPro
                 Native.SetDarkTitlebar(dlg.Handle, _dark);
 
                 PictureBox pic = new PictureBox { Size = new Size(42, 42), Location = new Point(18, 16), SizeMode = PictureBoxSizeMode.Zoom, Image = _logoBmp };
-                Label hdr = new Label { Text = "NillyNet Pro v1.3.2", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
+                Label hdr = new Label { Text = "NillyNet Pro v1.3.3", Location = new Point(70, 16), AutoSize = true, Font = new Font("Segoe UI", 13.0f, FontStyle.Bold) };
                 Label sub = new Label { Text = "Ultra-Light Native Network Monitor, Wi-Fi Band/Speed Analyzer & DNS Tools", Location = new Point(72, 42), AutoSize = true, Font = _fSmall, ForeColor = _accent, UseMnemonic = false };
 
                 Panel card = new Panel { Location = new Point(18, 72), Size = new Size(478, 200), BackColor = _bgPanel };
